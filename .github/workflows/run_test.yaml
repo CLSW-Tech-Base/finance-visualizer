@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["main"]
 
+# to restrict the access to read ONLY
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -18,11 +22,31 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirement.txt
+          pip install bandit pip-audit flake8
+
+      # To check syntax format
+      - name: Run Lint with flake8
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      # To check if there is any unsecure code
+      # -r to recursive, -ll to report only medium/high issue
+      - name: Run security scan with bandit (SAST)
+        run: |
+          bandit -r . -ll
+
+      # Check if any required dependencies have vulnerability
+      # if any error from this scan, dependency update is required
+      - name: Dependency Vulnerability Scan with Pip-Audit (SCA)
+        run: |
+          pip-audit
 
       - name: Run Tests with Pytest
         run: |
